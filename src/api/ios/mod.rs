@@ -115,7 +115,7 @@ impl Context {
         unsafe {
             let app: id = msg_send![Class::get("UIApplication").unwrap(), sharedApplication]; // NOTE: Isn't that just `shared`?
             let delegate: id = msg_send![app, delegate];
-            let state: *mut libc::c_void = *(&*delegate).get_ivar("glutinState");
+            let state: *mut c_void = *(&*delegate).get_ivar("glutinState");
             let state = state as *mut DelegateState;
 
             let main_screen: id = msg_send![Class::get("UIScreen").unwrap(), mainScreen];
@@ -125,15 +125,15 @@ impl Context {
             let view: id = msg_send![class, alloc];
             let view: id = msg_send![view, initForGl: &bounds];
 
-            let _: () = msg_send![state.controller, setView: view];
-            let _: () = msg_send![state.window, addSubview: view];
+            let _: () = msg_send![(*state).controller, setView: view];
+            let _: () = msg_send![(*state).window, addSubview: view];
 
             let mut ctx = Context {
                 eagl_context: eagl_ctx,
                 view: view,
             };
 
-            ctx.init_context(&window_builder.window, &state);
+            ctx.init_context(&window_builder.window, &*state);
             Ok((window, ctx))
         }
     }
@@ -156,12 +156,12 @@ impl Context {
         let _ = self.make_current();
 
         if builder.multitouch {
-            let _: () = msg_send![state.view, setMultipleTouchEnabled: YES];
+            let _: () = msg_send![self.view, setMultipleTouchEnabled: YES];
         }
 
-        let _: () = msg_send![state.view, setContentScaleFactor:state.scale as CGFloat];
+        let _: () = msg_send![self.view, setContentScaleFactor:state.scale as CGFloat];
 
-        let layer: id = msg_send![state.view, layer];
+        let layer: id = msg_send![self.view, layer];
         let _: () = msg_send![layer, setContentsScale:state.scale as CGFloat];
         let _: () = msg_send![layer, setDrawableProperties: draw_props];
 
@@ -256,12 +256,12 @@ fn create_uiview_class() {
     }
 
     let superclass = Class::get("UIView").unwrap();
-    let mut decl = ClassDecl::new(superclass, VIEW_CLASS).unwrap();
+    let mut decl = ClassDecl::new(VIEW_CLASS, superclass).unwrap();
 
     unsafe {
         decl.add_method(
             sel!(initForGl:),
-            init_for_gl as extern "C" fn(&Object, Sel, *const libc::c_void) -> id,
+            init_for_gl as extern "C" fn(&Object, Sel, *const c_void) -> id,
         );
 
         decl.add_class_method(

@@ -90,7 +90,7 @@ extern {
 }
 
 pub trait NSString {
-    unsafe fn alloc(_: Self) -> id {
+    unsafe fn alloc(_: Self) -> id where Self: std::marker::Sized {
         msg_send![class("NSString"), alloc]
     }
 
