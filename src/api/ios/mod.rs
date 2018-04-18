@@ -56,163 +56,72 @@
 //!
 //! Also note that app will not receive Closed event if suspended, it will be SIGKILL'ed
 
-
-
-
 #![cfg(target_os = "ios")]
 #![deny(warnings)]
 
-use std::collections::VecDeque;
-use std::ffi::CString;
-use std::{mem, io, os, ptr};
+use winit;
+use PixelFormatRequirements;
+use GlAttributes;
+use CreationError;
+use WindowAttributes;
 
-use libc;
-use objc::runtime::{Class, BOOL, YES, NO };
-
-use native_monitor::NativeMonitorId;
-use { Api, PixelFormat, CreationError, GlContext, CursorState, MouseCursor, Event };
-use { PixelFormatRequirements, GlAttributes, WindowAttributes, ContextError };
-use CreationError::OsError;
-
-mod delegate;
-use self::delegate::{ create_delegate_class, create_view_class };
+use std::os::raw::c_void;
+use std::io;
 
 mod ffi;
-use self::ffi::{
-    gles,
-    setjmp,
-    dlopen,
-    dlsym,
-    UIApplicationMain,
-    kEAGLColorFormatRGB565,
-    CFTimeInterval,
-    CFRunLoopRunInMode,
-    kCFRunLoopDefaultMode,
-    kCFRunLoopRunHandledSource,
-    kEAGLDrawablePropertyRetainedBacking,
-    kEAGLDrawablePropertyColorFormat,
-    RTLD_LAZY,
-    RTLD_GLOBAL,
-    id,
-    nil,
-    NSString,
-    CGFloat
- };
+use self::ffi::{dlopen, dlsym, gles, id, nil, setjmp, CFRunLoopRunInMode, CFTimeInterval, CGFloat,
+                NSString, UIApplicationMain, kCFRunLoopDefaultMode, kCFRunLoopRunHandledSource,
+                kEAGLColorFormatRGB565, kEAGLDrawablePropertyColorFormat,
+                kEAGLDrawablePropertyRetainedBacking, RTLD_GLOBAL, RTLD_LAZY};
 
+use objc::runtime::{Class, BOOL, NO, YES};
 
-static mut jmpbuf: [libc::c_int;27] = [0;27];
+const VIEW_CLASS: &'static str = "MainView";
 
-#[derive(Clone)]
-pub struct MonitorId;
-
-pub struct Window {
+pub struct Context {
     eagl_context: id,
-    delegate_state: *mut DelegateState
-}
-
-#[derive(Clone)]
-pub struct WindowProxy;
-
-pub struct PollEventsIterator<'a> {
-    window: &'a Window,
-}
-
-pub struct WaitEventsIterator<'a> {
-    window: &'a Window,
-}
-
-#[derive(Debug)]
-struct DelegateState {
-    events_queue: VecDeque<Event>,
-    window: id,
-    controller: id,
     view: id,
-    size: (u32,u32),
-    scale: f32
 }
 
+impl Context {
+    pub fn new(
+        window_builder: winit::WindowBuilder,
+        events_loop: &winit::EventsLoop,
+        pf_reqs: &PixelFormatRequirements,
+        gl_attr: &GlAttributes<&Self>,
+    ) -> Result<(winit::Window, Self), CreationError> {
+        let window = try!(window_builder.build(events_loop));
+        let eagl_ctx = Context::create_context();
 
-impl DelegateState {
-    #[inline]
-    fn new(window: id, controller:id, view: id, size: (u32,u32), scale: f32) -> DelegateState {
-        DelegateState {
-            events_queue: VecDeque::new(),
-            window: window,
-            controller: controller,
-            view: view,
-            size: size,
-            scale: scale
-        }
-    }
-}
-
-#[inline]
-pub fn get_available_monitors() -> VecDeque<MonitorId> {
-    let mut rb = VecDeque::new();
-    rb.push_back(MonitorId);
-    rb
-}
-
-#[inline]
-pub fn get_primary_monitor() -> MonitorId {
-    MonitorId
-}
-
-impl MonitorId {
-    #[inline]
-    pub fn get_name(&self) -> Option<String> {
-        Some("Primary".to_string())
-    }
-
-    #[inline]
-    pub fn get_native_identifier(&self) -> NativeMonitorId {
-        NativeMonitorId::Unavailable
-    }
-
-    #[inline]
-    pub fn get_dimensions(&self) -> (u32, u32) {
-        unimplemented!()
-    }
-}
-
-#[derive(Clone, Default)]
-pub struct PlatformSpecificWindowBuilderAttributes;
-
-impl Window {
-
-    pub fn new(builder: &WindowAttributes, _: &PixelFormatRequirements, _: &GlAttributes<&Window>,
-               _: &PlatformSpecificWindowBuilderAttributes) -> Result<Window, CreationError>
-    {
+        create_uiview_class();
         unsafe {
-            if setjmp(mem::transmute(&mut jmpbuf)) != 0 {
-                let app: id = msg_send![Class::get("UIApplication").unwrap(), sharedApplication];
-                let delegate: id = msg_send![app, delegate];
-                let state: *mut libc::c_void = *(&*delegate).get_ivar("glutinState");
-                let state = state as *mut DelegateState;
+            let app: id = msg_send![Class::get("UIApplication").unwrap(), sharedApplication]; // NOTE: Isn't that just `shared`?
+            let delegate: id = msg_send![app, delegate];
+            let state: *mut libc::c_void = *(&*delegate).get_ivar("glutinState");
+            let state = state as *mut DelegateState;
 
-                let context = Window::create_context();
+            let main_screen: id = msg_send![Class::get("UIScreen").unwrap(), mainScreen];
+            let bounds: CGRect = msg_send![main_screen, bounds];
 
-                let mut window = Window {
-                    eagl_context: context,
-                    delegate_state: state
-                };
+            let class = Class::get(VIEW_CLASS).unwrap();
+            let view: id = msg_send![class, alloc];
+            let view: id = msg_send![view, initForGl: &bounds];
 
-                window.init_context(builder);
+            let _: () = msg_send![state.controller, setView:view];
 
-                return Ok(window)
-            }
+            let mut ctx = Context {
+                eagl_context: eagl_ctx,
+                view: view,
+            };
+
+            ctx.init_context(&builder.window, &state);
+            Ok((window, ctx))
         }
-
-        create_delegate_class();
-        create_view_class();
-        Window::start_app();
-
-        Err(CreationError::OsError(format!("Couldn't create UIApplication")))
     }
 
-    unsafe fn init_context(&mut self, builder: &WindowAttributes) {
+    unsafe fn init_context(&mut self, builder: &WindowAttributes, state: &DelegateState) {
         let draw_props: id = msg_send![Class::get("NSDictionary").unwrap(), alloc];
-            let draw_props: id = msg_send![draw_props,
+        let draw_props: id = msg_send![draw_props,
                     initWithObjects:
                         vec![
                             msg_send![Class::get("NSNumber").unwrap(), numberWithBool: NO],
@@ -227,10 +136,8 @@ impl Window {
             ];
         let _ = self.make_current();
 
-        let state = &mut *self.delegate_state;
-
         if builder.multitouch {
-            let _: () = msg_send![state.view, setMultipleTouchEnabled:YES];
+            let _: () = msg_send![state.view, setMultipleTouchEnabled: YES];
         }
 
         let _: () = msg_send![state.view, setContentScaleFactor:state.scale as CGFloat];
@@ -239,13 +146,14 @@ impl Window {
         let _: () = msg_send![layer, setContentsScale:state.scale as CGFloat];
         let _: () = msg_send![layer, setDrawableProperties: draw_props];
 
-        let gl = gles::Gles2::load_with(|symbol| self.get_proc_address(symbol));
+        let gl = gles::Gles2::load_with(|symbol| self.get_proc_address(symbol) as *const c_void);
         let mut color_render_buf: gles::types::GLuint = 0;
         let mut frame_buf: gles::types::GLuint = 0;
         gl.GenRenderbuffers(1, &mut color_render_buf);
         gl.BindRenderbuffer(gles::RENDERBUFFER, color_render_buf);
 
-        let ok: BOOL = msg_send![self.eagl_context, renderbufferStorage:gles::RENDERBUFFER fromDrawable:layer];
+        let ok: BOOL =
+            msg_send![self.eagl_context, renderbufferStorage:gles::RENDERBUFFER fromDrawable:layer];
         if ok != YES {
             panic!("EAGL: could not set renderbufferStorage");
         }
@@ -253,7 +161,12 @@ impl Window {
         gl.GenFramebuffers(1, &mut frame_buf);
         gl.BindFramebuffer(gles::FRAMEBUFFER, frame_buf);
 
-        gl.FramebufferRenderbuffer(gles::FRAMEBUFFER, gles::COLOR_ATTACHMENT0, gles::RENDERBUFFER, color_render_buf);
+        gl.FramebufferRenderbuffer(
+            gles::FRAMEBUFFER,
+            gles::COLOR_ATTACHMENT0,
+            gles::RENDERBUFFER,
+            color_render_buf,
+        );
 
         let status = gl.CheckFramebufferStatus(gles::FRAMEBUFFER);
         if gl.CheckFramebufferStatus(gles::FRAMEBUFFER) != gles::FRAMEBUFFER_COMPLETE {
@@ -270,125 +183,20 @@ impl Window {
     }
 
     #[inline]
-    fn start_app() {
-        unsafe {
-            UIApplicationMain(0, ptr::null(), nil, NSString::alloc(nil).init_str("AppDelegate"));
-        }
-    }
-
-    #[inline]
-    pub fn set_title(&self, _: &str) {
-    }
-
-    #[inline]
-    pub fn show(&self) {
-    }
-
-    #[inline]
-    pub fn hide(&self) {
-    }
-
-    #[inline]
-    pub fn get_position(&self) -> Option<(i32, i32)> {
-        None
-    }
-
-    #[inline]
-    pub fn set_position(&self, _x: i32, _y: i32) {
-    }
-
-    #[inline]
-    pub fn get_inner_size(&self) -> Option<(u32, u32)> {
-        unsafe { Some((&*self.delegate_state).size) }
-    }
-
-    #[inline]
-    pub fn get_outer_size(&self) -> Option<(u32, u32)> {
-        self.get_inner_size()
-    }
-
-    #[inline]
-    pub fn set_inner_size(&self, _x: u32, _y: u32) {
-    }
-
-    #[inline]
-    pub fn poll_events(&self) -> PollEventsIterator {
-        PollEventsIterator {
-            window: self
-        }
-    }
-
-    #[inline]
-    pub fn wait_events(&self) -> WaitEventsIterator {
-        WaitEventsIterator {
-            window: self
-        }
-    }
-
-    #[inline]
-    pub fn platform_display(&self) -> *mut libc::c_void {
-        unimplemented!();
-    }
-
-    #[inline]
-    pub fn platform_window(&self) -> *mut libc::c_void {
-        unimplemented!()
-    }
-
-    #[inline]
-    pub fn get_pixel_format(&self) -> PixelFormat {
-        unimplemented!();
-    }
-
-    #[inline]
-    pub fn set_window_resize_callback(&mut self, _: Option<fn(u32, u32)>) {}
-
-    #[inline]
-    pub fn set_cursor(&self, _: MouseCursor) {}
-
-    #[inline]
-    pub fn set_cursor_state(&self, _: CursorState) -> Result<(), String> {
-        Ok(())
-    }
-
-    #[inline]
-    pub fn hidpi_factor(&self) -> f32 {
-        unsafe { (&*self.delegate_state) }.scale
-    }
-
-    #[inline]
-    pub fn set_cursor_position(&self, _x: i32, _y: i32) -> Result<(), ()> {
-        unimplemented!();
-    }
-
-    #[inline]
-    pub fn create_window_proxy(&self) -> WindowProxy {
-        WindowProxy
-    }
-
-    #[inline]
-    pub unsafe fn raw_handle(&self) -> *mut os::raw::c_void {
-        self.eagl_context as *mut _
-    }
-}
-
-impl GlContext for Window {
-    #[inline]
     unsafe fn make_current(&self) -> Result<(), ContextError> {
-        let res: BOOL = msg_send![Class::get("EAGLContext").unwrap(), setCurrentContext: self.eagl_context];
+        let res: BOOL =
+            msg_send![Class::get("EAGLContext").unwrap(), setCurrentContext: self.eagl_context];
         if res == YES {
             Ok(())
         } else {
-            Err(ContextError::IoError(io::Error::new(io::ErrorKind::Other, "EAGLContext::setCurrentContext unsuccessful")))
+            Err(ContextError::IoError(io::Error::new(
+                io::ErrorKind::Other,
+                "EAGLContext::setCurrentContext unsuccessful",
+            )))
         }
     }
 
-    #[inline]
-    fn is_current(&self) -> bool {
-        false
-    }
-
-    fn get_proc_address(&self, addr: &str) -> *const () {
+    pub fn get_proc_address(&self, addr: &str) -> *const () {
         let addr_c = CString::new(addr).unwrap();
         let path = CString::new("/System/Library/Frameworks/OpenGLES.framework/OpenGLES").unwrap();
         unsafe {
@@ -396,71 +204,51 @@ impl GlContext for Window {
             dlsym(lib, addr_c.as_ptr()) as *const _
         }
     }
+}
 
-    #[inline]
-    fn swap_buffers(&self) -> Result<(), ContextError> {
+static BUILD_ONCE: bool = false;
+fn create_uiview_class() {
+    if BUILD_ONCE {
+        return;
+    }
+    BUILD_ONCE = true;
+
+    extern "C" fn init_for_gl(this: &Object, _: Sel, frame: *const libc::c_void) -> id {
         unsafe {
-            let res: BOOL = msg_send![self.eagl_context, presentRenderbuffer: gles::RENDERBUFFER];
-            if res == YES {
-                Ok(())
-            } else {
-                Err(ContextError::IoError(io::Error::new(io::ErrorKind::Other, "EAGLContext.presentRenderbuffer unsuccessful")))
-            }
+            let bounds: *const CGRect = mem::transmute(frame);
+            let view: id = msg_send![this, initWithFrame:(*bounds).clone()];
+
+            let _: () = msg_send![
+                view,
+                setAutoresizingMask: UIViewAutoresizingFlexibleWidth
+                    | UIViewAutoresizingFlexibleHeight
+            ];
+            let _: () = msg_send![view, setAutoresizesSubviews: YES];
+
+            let layer: id = msg_send![view, layer];
+            let _: () = msg_send![layer, setOpaque: YES];
+
+            view
         }
     }
 
-    #[inline]
-    fn get_api(&self) -> Api {
-        unimplemented!()
+    extern "C" fn layer_class(_: &Class, _: Sel) -> *const Class {
+        unsafe { mem::transmute(Class::get("CAEAGLLayer").unwrap()) }
     }
 
-    #[inline]
-    fn get_pixel_format(&self) -> PixelFormat {
-        unimplemented!()
-    }
-}
+    let superclass = Class::get("UIView").unwrap();
+    let mut decl = ClassDecl::new(superclass, VIEW_CLASS).unwrap();
 
-impl WindowProxy {
-    #[inline]
-    pub fn wakeup_event_loop(&self) {
-        unimplemented!()
-    }
-}
+    unsafe {
+        decl.add_method(
+            sel!(initForGl:),
+            init_for_gl as extern "C" fn(&Object, Sel, *const libc::c_void) -> id,
+        );
 
-impl<'a> Iterator for WaitEventsIterator<'a> {
-    type Item = Event;
-
-    #[inline]
-    fn next(&mut self) -> Option<Event> {
-        loop {
-            if let Some(ev) = self.window.poll_events().next() {
-                return Some(ev);
-            }
-        }
-    }
-}
-
-impl<'a> Iterator for PollEventsIterator<'a> {
-    type Item = Event;
-
-    fn next(&mut self) -> Option<Event> {
-        unsafe {
-            let state = &mut *self.window.delegate_state;
-
-            if let Some(event) = state.events_queue.pop_front() {
-                return Some(event)
-            }
-
-            // jump hack, so we won't quit on willTerminate event before processing it
-            if setjmp(mem::transmute(&mut jmpbuf)) != 0 {
-                return state.events_queue.pop_front()
-            }
-
-            // run runloop
-            let seconds: CFTimeInterval = 0.000002;
-            while CFRunLoopRunInMode(kCFRunLoopDefaultMode, seconds, 1) == kCFRunLoopRunHandledSource {}
-
-            state.events_queue.pop_front()
-        }
+        decl.add_class_method(
+            sel!(layerClass),
+            layer_class as extern "C" fn(&Class, Sel) -> *const Class,
+        );
+        decl.register();
     }
 }
