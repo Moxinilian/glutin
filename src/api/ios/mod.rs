@@ -59,24 +59,42 @@
 #![cfg(target_os = "ios")]
 #![deny(warnings)]
 
+use libc;
 use winit;
 use PixelFormatRequirements;
 use GlAttributes;
 use CreationError;
+use ContextError;
 use WindowAttributes;
+use Event;
 
 use std::os::raw::c_void;
-use std::io;
+use std::{io, mem};
+use std::ffi::CString;
+use std::collections::VecDeque;
 
 mod ffi;
-use self::ffi::{dlopen, dlsym, gles, id, nil, setjmp, CFRunLoopRunInMode, CFTimeInterval, CGFloat,
-                NSString, UIApplicationMain, kCFRunLoopDefaultMode, kCFRunLoopRunHandledSource,
-                kEAGLColorFormatRGB565, kEAGLDrawablePropertyColorFormat,
-                kEAGLDrawablePropertyRetainedBacking, RTLD_GLOBAL, RTLD_LAZY};
+use self::ffi::{dlopen, dlsym, gles, id, CGFloat, CGRect, UIViewAutoresizingFlexibleHeight,
+                UIViewAutoresizingFlexibleWidth, kEAGLColorFormatRGB565,
+                kEAGLDrawablePropertyColorFormat, kEAGLDrawablePropertyRetainedBacking,
+                RTLD_GLOBAL, RTLD_LAZY};
 
-use objc::runtime::{Class, BOOL, NO, YES};
+use objc::declare::ClassDecl;
+use objc::runtime::{Class, Object, Sel, BOOL, NO, YES};
 
 const VIEW_CLASS: &'static str = "MainView";
+
+// FIXME: This is redeclaring private's iOS DelegateState.
+// We unsafely cast winit's DelegateState into this new declaration because winit's is private.
+// This is awful and should definitely be fixed.
+#[derive(Debug)]
+struct DelegateState {
+    events_queue: VecDeque<Event>,
+    window: id,
+    controller: id,
+    size: (u32, u32),
+    scale: f32,
+}
 
 pub struct Context {
     eagl_context: id,
@@ -107,15 +125,15 @@ impl Context {
             let view: id = msg_send![class, alloc];
             let view: id = msg_send![view, initForGl: &bounds];
 
-            let _: () = msg_send![state.controller, setView:view];
-            let _: () = msg_send![state.window, addSubview:view];
+            let _: () = msg_send![state.controller, setView: view];
+            let _: () = msg_send![state.window, addSubview: view];
 
             let mut ctx = Context {
                 eagl_context: eagl_ctx,
                 view: view,
             };
 
-            ctx.init_context(&builder.window, &state);
+            ctx.init_context(&window_builder.window, &state);
             Ok((window, ctx))
         }
     }
@@ -184,7 +202,7 @@ impl Context {
     }
 
     #[inline]
-    unsafe fn make_current(&self) -> Result<(), ContextError> {
+    pub unsafe fn make_current(&self) -> Result<(), ContextError> {
         let res: BOOL =
             msg_send![Class::get("EAGLContext").unwrap(), setCurrentContext: self.eagl_context];
         if res == YES {

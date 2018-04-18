@@ -50,7 +50,7 @@ extern crate winapi;
 extern crate objc;
 #[cfg(target_os = "macos")]
 extern crate cgl;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "ios"))]
 extern crate cocoa;
 #[cfg(target_os = "macos")]
 extern crate core_foundation;
