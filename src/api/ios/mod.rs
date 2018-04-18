@@ -232,7 +232,7 @@ fn create_uiview_class() {
     }
     BUILD_ONCE = true;
 
-    extern "C" fn init_for_gl(this: &Object, _: Sel, frame: *const libc::c_void) -> id {
+    extern "C" fn init_for_gl(this: &Object, _: Sel, frame: *const c_void) -> id {
         unsafe {
             let bounds: *const CGRect = mem::transmute(frame);
             let view: id = msg_send![this, initWithFrame:(*bounds).clone()];
