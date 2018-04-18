@@ -108,6 +108,7 @@ impl Context {
             let view: id = msg_send![view, initForGl: &bounds];
 
             let _: () = msg_send![state.controller, setView:view];
+            let _: () = msg_send![state.window, addSubview:view];
 
             let mut ctx = Context {
                 eagl_context: eagl_ctx,
