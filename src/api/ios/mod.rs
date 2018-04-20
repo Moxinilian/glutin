@@ -98,7 +98,6 @@ struct DelegateState {
 
 pub struct Context {
     eagl_context: id,
-    view: id,
 }
 
 impl Context {
@@ -131,7 +130,6 @@ impl Context {
 
             let mut ctx = Context {
                 eagl_context: eagl_ctx,
-                view: view,
             };
 
             ctx.init_context(&attr, view, scale);
