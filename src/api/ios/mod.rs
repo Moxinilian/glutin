@@ -107,7 +107,7 @@ impl Context {
         window_builder: winit::WindowBuilder,
         events_loop: &winit::EventsLoop,
         pf_reqs: &PixelFormatRequirements,
-        gl_attr: &GlAttributes<&Self>,
+        _gl_attr: &GlAttributes<&Self>,
     ) -> Result<(winit::Window, Self), CreationError> {
         let window = try!(window_builder.build(events_loop));
         let eagl_ctx = Context::create_context();
@@ -258,6 +258,7 @@ impl Context {
     #[inline]
     pub fn resize(&self, width: u32, height: u32) {
         // No sense on iOS
+        unimplemented!()
     }
 }
 
