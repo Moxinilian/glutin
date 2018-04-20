@@ -222,6 +222,36 @@ impl Context {
             dlsym(lib, addr_c.as_ptr()) as *const _
         }
     }
+
+    #[inline]
+    fn swap_buffers(&self) -> Result<(), ContextError> {
+        unsafe {
+            let res: BOOL = msg_send![self.eagl_context, presentRenderbuffer: gles::RENDERBUFFER];
+            if res == YES {
+                Ok(())
+            } else {
+                Err(ContextError::IoError(io::Error::new(io::ErrorKind::Other, "EAGLContext.presentRenderbuffer unsuccessful")))
+            }
+        }
+    }
+
+    #[inline]
+    fn is_current(&self) -> bool {
+        unsafe {
+            let res: id = msg_send![Class::get("EAGLContext").unwrap(), current];
+            return res == self.eagl_context;
+        }
+    }
+
+    #[inline]
+    fn get_api(&self) -> Api {
+        ::Api::OpenGlEs
+    }
+
+    #[inline]
+    fn get_pixel_format(&self) -> PixelFormat {
+        unimplemented!()
+    }
 }
 
 static BUILD_ONCE: bool = false;
