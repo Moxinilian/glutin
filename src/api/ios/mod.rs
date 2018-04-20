@@ -85,6 +85,7 @@ use objc::runtime::{Class, Object, Sel, BOOL, NO, YES};
 
 const VIEW_CLASS: &'static str = "MainView";
 
+/*
 // FIXME: This is redeclaring private's iOS DelegateState.
 // We unsafely cast winit's DelegateState into this new declaration because winit's is private.
 // This is awful and should definitely be fixed.
@@ -95,7 +96,7 @@ struct DelegateState {
     controller: id,
     size: (u32, u32),
     scale: f32,
-}
+}*/
 
 pub struct Context {
     eagl_context: id,
@@ -116,31 +117,31 @@ impl Context {
         create_uiview_class();
         unsafe {
             let app: id = msg_send![Class::get("UIApplication").unwrap(), sharedApplication]; // NOTE: Isn't that just `shared`?
-            let delegate: id = msg_send![app, delegate];
-            let state: *mut c_void = *(&*delegate).get_ivar("glutinState");
-            let state = state as *mut DelegateState;
+            let window: id = msg_send![app, keyWindow];
+            let controller: id = msg_send![window, rootViewController];
 
             let main_screen: id = msg_send![Class::get("UIScreen").unwrap(), mainScreen];
             let bounds: CGRect = msg_send![main_screen, bounds];
+            let scale: CGFloat = msg_send![main_screen, nativeScale];
 
             let class = Class::get(VIEW_CLASS).unwrap();
             let view: id = msg_send![class, alloc];
             let view: id = msg_send![view, initForGl: &bounds];
 
-            let _: () = msg_send![(*state).controller, setView: view];
-            let _: () = msg_send![(*state).window, addSubview: view];
+            let _: () = msg_send![controller, setView: view];
+            let _: () = msg_send![window, addSubview: view];
 
             let mut ctx = Context {
                 eagl_context: eagl_ctx,
                 view: view,
             };
 
-            ctx.init_context(&attr, &*state);
+            ctx.init_context(&attr, view, scale);
             Ok((window, ctx))
         }
     }
 
-    unsafe fn init_context(&mut self, builder: &WindowAttributes, state: &DelegateState) {
+    unsafe fn init_context(&mut self, builder: &WindowAttributes, view: id, scale: CGFloat) {
         let draw_props: id = msg_send![Class::get("NSDictionary").unwrap(), alloc];
         let draw_props: id = msg_send![draw_props,
                     initWithObjects:
@@ -158,13 +159,13 @@ impl Context {
         let _ = self.make_current();
 
         if builder.multitouch {
-            let _: () = msg_send![self.view, setMultipleTouchEnabled: YES];
+            let _: () = msg_send![view, setMultipleTouchEnabled: YES];
         }
 
-        let _: () = msg_send![self.view, setContentScaleFactor:state.scale as CGFloat];
+        let _: () = msg_send![view, setContentScaleFactor:scale];
 
-        let layer: id = msg_send![self.view, layer];
-        let _: () = msg_send![layer, setContentsScale:state.scale as CGFloat];
+        let layer: id = msg_send![view, layer];
+        let _: () = msg_send![layer, setContentsScale:scale];
         let _: () = msg_send![layer, setDrawableProperties: draw_props];
 
         let gl = gles::Gles2::load_with(|symbol| self.get_proc_address(symbol) as *const c_void);
