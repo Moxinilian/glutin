@@ -224,7 +224,7 @@ impl Context {
     }
 
     #[inline]
-    fn swap_buffers(&self) -> Result<(), ContextError> {
+    pub fn swap_buffers(&self) -> Result<(), ContextError> {
         unsafe {
             let res: BOOL = msg_send![self.eagl_context, presentRenderbuffer: gles::RENDERBUFFER];
             if res == YES {
@@ -236,7 +236,7 @@ impl Context {
     }
 
     #[inline]
-    fn is_current(&self) -> bool {
+    pub fn is_current(&self) -> bool {
         unsafe {
             let res: id = msg_send![Class::get("EAGLContext").unwrap(), current];
             return res == self.eagl_context;
@@ -244,13 +244,18 @@ impl Context {
     }
 
     #[inline]
-    fn get_api(&self) -> Api {
+    pub fn get_api(&self) -> Api {
         ::Api::OpenGlEs
     }
 
     #[inline]
-    fn get_pixel_format(&self) -> PixelFormat {
+    pub fn get_pixel_format(&self) -> PixelFormat {
         unimplemented!()
+    }
+
+    #[inline]
+    pub fn resize(&self, width: u32, height: u32) {
+        // No sense on iOS
     }
 }
 
