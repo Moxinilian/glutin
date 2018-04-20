@@ -262,13 +262,7 @@ impl Context {
     }
 }
 
-static mut BUILD_ONCE: bool = false;
 fn create_uiview_class() {
-    if BUILD_ONCE {
-        return;
-    }
-    BUILD_ONCE = true;
-
     extern "C" fn init_for_gl(this: &Object, _: Sel, frame: *const c_void) -> id {
         unsafe {
             let bounds: *const CGRect = mem::transmute(frame);
