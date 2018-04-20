@@ -59,7 +59,6 @@
 #![cfg(target_os = "ios")]
 #![deny(warnings)]
 
-use libc;
 use winit;
 use PixelFormatRequirements;
 use GlAttributes;
