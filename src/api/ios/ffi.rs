@@ -1,8 +1,8 @@
 use std::ffi::CString;
-use std;
+//use std;
 
 use libc;
-use objc::runtime::{ Object, Class };
+use objc::runtime::{ Object /*, Class*/ };
 
 #[allow(non_camel_case_types)]
 pub type id = *mut Object;
