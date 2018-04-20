@@ -109,6 +109,7 @@ impl Context {
         _pf_reqs: &PixelFormatRequirements,
         _gl_attr: &GlAttributes<&Self>,
     ) -> Result<(winit::Window, Self), CreationError> {
+        let attr = window_builder.window.clone();
         let window = try!(window_builder.build(events_loop));
         let eagl_ctx = Context::create_context();
 
@@ -134,7 +135,7 @@ impl Context {
                 view: view,
             };
 
-            ctx.init_context(&window_builder.window, &*state);
+            ctx.init_context(&attr, &*state);
             Ok((window, ctx))
         }
     }
@@ -261,7 +262,7 @@ impl Context {
     }
 }
 
-static BUILD_ONCE: bool = false;
+static mut BUILD_ONCE: bool = false;
 fn create_uiview_class() {
     if BUILD_ONCE {
         return;
