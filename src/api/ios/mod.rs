@@ -256,9 +256,8 @@ impl Context {
     }
 
     #[inline]
-    pub fn resize(&self, width: u32, height: u32) {
+    pub fn resize(&self, _width: u32, _height: u32) {
         // No sense on iOS
-        unimplemented!()
     }
 }
 
