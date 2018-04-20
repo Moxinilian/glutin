@@ -65,14 +65,12 @@ use GlAttributes;
 use CreationError;
 use ContextError;
 use WindowAttributes;
-use Event;
 use Api;
 use PixelFormat;
 
 use std::os::raw::c_void;
 use std::{io, mem};
 use std::ffi::CString;
-use std::collections::VecDeque;
 
 mod ffi;
 use self::ffi::{dlopen, dlsym, gles, id, CGFloat, CGRect, UIViewAutoresizingFlexibleHeight,
@@ -111,7 +109,7 @@ impl Context {
         _gl_attr: &GlAttributes<&Self>,
     ) -> Result<(winit::Window, Self), CreationError> {
         let attr = window_builder.window.clone();
-        let window = try!(window_builder.build(events_loop));
+        let window_winit = try!(window_builder.build(events_loop));
         let eagl_ctx = Context::create_context();
 
         create_uiview_class();
@@ -137,7 +135,7 @@ impl Context {
             };
 
             ctx.init_context(&attr, view, scale);
-            Ok((window, ctx))
+            Ok((window_winit, ctx))
         }
     }
 
