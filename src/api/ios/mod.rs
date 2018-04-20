@@ -59,6 +59,14 @@
 #![cfg(target_os = "ios")]
 #![deny(warnings)]
 
+// Note to future maintainers
+// While the code seems scary at first, it is actually quite simple when
+// you consider that msg_send! simply is a macro to interact with
+// Objective-C context. This whole thing really just does what you
+// would have to do in Swift with complicated syntax.
+// However this complicated syntax makes it really messy, and therefore
+// please forgive me if it is far from being perfect. In fact, it's barely acceptable.
+
 use winit;
 use PixelFormatRequirements;
 use GlAttributes;
@@ -145,10 +153,10 @@ impl Context {
             let _: () = msg_send![view, setMultipleTouchEnabled: YES];
         }
 
-        let _: () = msg_send![view, setContentScaleFactor:scale];
+        let _: () = msg_send![view, setContentScaleFactor: scale];
 
         let layer: id = msg_send![view, layer];
-        let _: () = msg_send![layer, setContentsScale:scale];
+        let _: () = msg_send![layer, setContentsScale: scale];
         let _: () = msg_send![layer, setDrawableProperties: draw_props];
 
         let gl = gles::Gles2::load_with(|symbol| self.get_proc_address(symbol) as *const c_void);
@@ -217,7 +225,10 @@ impl Context {
             if res == YES {
                 Ok(())
             } else {
-                Err(ContextError::IoError(io::Error::new(io::ErrorKind::Other, "EAGLContext.presentRenderbuffer unsuccessful")))
+                Err(ContextError::IoError(io::Error::new(
+                    io::ErrorKind::Other,
+                    "EAGLContext.presentRenderbuffer unsuccessful",
+                )))
             }
         }
     }
