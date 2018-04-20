@@ -66,6 +66,8 @@ use CreationError;
 use ContextError;
 use WindowAttributes;
 use Event;
+use Api;
+use PixelFormat;
 
 use std::os::raw::c_void;
 use std::{io, mem};
