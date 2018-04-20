@@ -106,7 +106,7 @@ impl Context {
     pub fn new(
         window_builder: winit::WindowBuilder,
         events_loop: &winit::EventsLoop,
-        pf_reqs: &PixelFormatRequirements,
+        _pf_reqs: &PixelFormatRequirements,
         _gl_attr: &GlAttributes<&Self>,
     ) -> Result<(winit::Window, Self), CreationError> {
         let window = try!(window_builder.build(events_loop));
