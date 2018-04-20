@@ -83,19 +83,6 @@ use objc::runtime::{Class, Object, Sel, BOOL, NO, YES};
 
 const VIEW_CLASS: &'static str = "MainView";
 
-/*
-// FIXME: This is redeclaring private's iOS DelegateState.
-// We unsafely cast winit's DelegateState into this new declaration because winit's is private.
-// This is awful and should definitely be fixed.
-#[derive(Debug)]
-struct DelegateState {
-    events_queue: VecDeque<Event>,
-    window: id,
-    controller: id,
-    size: (u32, u32),
-    scale: f32,
-}*/
-
 pub struct Context {
     eagl_context: id,
 }
