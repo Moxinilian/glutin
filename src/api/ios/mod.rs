@@ -303,44 +303,14 @@ fn create_uiview_class() {
 }
 
 fn create_pixel_format(reqs: &PixelFormatRequirements) -> PixelFormat {
-    let hardware_acc = match reqs.hardware_accelerated {
-        Some(bol) => bol,
-        None => true,
-    };
-
-    let color_bits = match reqs.color_bits {
-        Some(n) => n,
-        None => 24,
-    };
-
-    let alpha_bits = match reqs.alpha_bits {
-        Some(n) => n,
-        None => 8,
-    };
-
-    let depth_bits = match reqs.depth_bits {
-        Some(n) => n,
-        None => 24,
-    };
-
-    let stencil_bits = match reqs.stencil_bits {
-        Some(n) => n,
-        None => 8,
-    };
-
-    let double_buf = match reqs.double_buffer {
-        Some(bol) => bol,
-        None => true,
-    };
-
     PixelFormat {
-        hardware_accelerated: hardware_acc,
-        color_bits: color_bits,
-        alpha_bits: alpha_bits,
-        depth_bits: depth_bits,
-        stencil_bits: stencil_bits,
+        hardware_accelerated: reqs.hardware_accelerated.unwrap_or(true),
+        color_bits: reqs.color_bits.unwrap_or(24),
+        alpha_bits: reqs.alpha_bits.unwrap_or(8),
+        depth_bits: reqs.depth_bits.unwrap_or(24),
+        stencil_bits: reqs.stencil_bits.unwrap_or(8),
         stereoscopy: reqs.stereoscopy,
-        double_buffer: double_buf,
+        double_buffer: reqs.double_buffer.unwrap_or(true),
         multisampling: reqs.multisampling,
         srgb: reqs.srgb,
     }
