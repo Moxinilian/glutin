@@ -93,18 +93,21 @@ const VIEW_CLASS: &'static str = "MainView";
 
 pub struct Context {
     eagl_context: id,
+    pixel_format: PixelFormat,
 }
 
 impl Context {
     pub fn new(
         window_builder: winit::WindowBuilder,
         events_loop: &winit::EventsLoop,
-        _pf_reqs: &PixelFormatRequirements,
+        pf_reqs: &PixelFormatRequirements,
         _gl_attr: &GlAttributes<&Self>,
     ) -> Result<(winit::Window, Self), CreationError> {
         let attr = window_builder.window.clone();
         let window_winit = try!(window_builder.build(events_loop));
         let eagl_ctx = Context::create_context();
+
+        let pixel_format = create_pixel_format(pf_reqs);
 
         create_uiview_class();
         unsafe {
@@ -125,6 +128,7 @@ impl Context {
 
             let mut ctx = Context {
                 eagl_context: eagl_ctx,
+                pixel_format: pixel_format,
             };
 
             ctx.init_context(&attr, view, scale);
@@ -248,7 +252,7 @@ impl Context {
 
     #[inline]
     pub fn get_pixel_format(&self) -> PixelFormat {
-        unimplemented!()
+        self.pixel_format.clone()
     }
 
     #[inline]
@@ -295,5 +299,49 @@ fn create_uiview_class() {
             layer_class as extern "C" fn(&Class, Sel) -> *const Class,
         );
         decl.register();
+    }
+}
+
+fn create_pixel_format(reqs: &PixelFormatRequirements) -> PixelFormat {
+    let hardware_acc = match reqs.hardware_accelerated {
+        Some(bol) => bol,
+        None => true,
+    };
+
+    let color_bits = match reqs.color_bits {
+        Some(n) => n,
+        None => 24,
+    };
+
+    let alpha_bits = match reqs.alpha_bits {
+        Some(n) => n,
+        None => 8,
+    };
+
+    let depth_bits = match reqs.depth_bits {
+        Some(n) => n,
+        None => 24,
+    };
+
+    let stencil_bits = match reqs.stencil_bits {
+        Some(n) => n,
+        None => 8,
+    };
+
+    let double_buf = match reqs.double_buffer {
+        Some(bol) => bol,
+        None => true,
+    };
+
+    PixelFormat {
+        hardware_accelerated: hardware_acc,
+        color_bits: color_bits,
+        alpha_bits: alpha_bits,
+        depth_bits: depth_bits,
+        stencil_bits: stencil_bits,
+        stereoscopy: reqs.stereoscopy,
+        double_buffer: double_buf,
+        multisampling: reqs.multisampling,
+        srgb: reqs.srgb,
     }
 }
