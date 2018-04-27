@@ -69,6 +69,7 @@ extern {
     // pub static kEAGLColorFormatRGBA8: id;
     pub static kEAGLDrawablePropertyColorFormat: id;
     pub static kEAGLDrawablePropertyRetainedBacking: id;
+    pub static kEAGLRenderingAPIOpenGLES3: id;
 
     // int UIApplicationMain ( int argc, char *argv[], NSString *principalClassName, NSString *delegateClassName );
     //pub fn UIApplicationMain(argc: libc::c_int, argv: *const libc::c_char, principalClassName: id, delegateClassName: id) -> libc::c_int;

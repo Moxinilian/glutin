@@ -82,7 +82,7 @@ use std::ffi::CString;
 
 mod ffi;
 use self::ffi::{dlopen, dlsym, gles, id, CGFloat, CGRect, UIViewAutoresizingFlexibleHeight,
-                UIViewAutoresizingFlexibleWidth, kEAGLColorFormatRGB565,
+                UIViewAutoresizingFlexibleWidth, kEAGLColorFormatRGB565, kEAGLRenderingAPIOpenGLES3,
                 kEAGLDrawablePropertyColorFormat, kEAGLDrawablePropertyRetainedBacking,
                 RTLD_GLOBAL, RTLD_LAZY};
 
@@ -194,7 +194,7 @@ impl Context {
     fn create_context() -> id {
         unsafe {
             let eagl_context: id = msg_send![Class::get("EAGLContext").unwrap(), alloc];
-            let eagl_context: id = msg_send![eagl_context, initWithAPI:2]; // es2
+            let eagl_context: id = msg_send![eagl_context, initWithAPI:kEAGLRenderingAPIOpenGLES3]; // es2
             eagl_context
         }
     }
