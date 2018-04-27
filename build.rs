@@ -128,8 +128,8 @@ fn main() {
                       ])
             .write_bindings(gl_generator::StaticStructGenerator, &mut file).unwrap();
 
-        let mut file = File::create(&dest.join("gles2_bindings.rs")).unwrap();
-        Registry::new(Api::Gles2, (2, 0), Profile::Core, Fallbacks::None, [])
+        let mut file = File::create(&dest.join("gles3_bindings.rs")).unwrap();
+        Registry::new(Api::Gles3, (2, 0), Profile::Core, Fallbacks::None, [])
             .write_bindings(gl_generator::StaticStructGenerator, &mut file).unwrap();
     }
 

@@ -194,7 +194,7 @@ impl Context {
     fn create_context() -> id {
         unsafe {
             let eagl_context: id = msg_send![Class::get("EAGLContext").unwrap(), alloc];
-            let eagl_context: id = msg_send![eagl_context, initWithAPI:kEAGLRenderingAPIOpenGLES3]; // es2
+            let eagl_context: id = msg_send![eagl_context, initWithAPI:3]; // es3
             eagl_context
         }
     }
