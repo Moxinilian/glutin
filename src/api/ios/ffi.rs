@@ -56,7 +56,7 @@ pub struct CGSize {
 }
 
 pub mod gles {
-    include!(concat!(env!("OUT_DIR"), "/gles3_bindings.rs"));
+    include!(concat!(env!("OUT_DIR"), "/gles2_bindings.rs"));
 }
 
 #[link(name = "UIKit", kind = "framework")]
